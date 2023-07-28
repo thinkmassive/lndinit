@@ -1,0 +1,27 @@
+# Default values for lndinit helm chart
+
+image:
+  name: lightninglabs/lndinit
+  #tag: v0.1.15-beta-lnd-v0.16.4-beta
+  pullPolicy: Always
+serviceAccount:
+  create: true
+  #name: lnd
+lnd:
+  bitcoind:
+    hostname: bitcoind
+    port: 8332
+  btcd:
+    enabled: false
+    hostname: btcd
+    port: 8334
+  certDir: /root/.lnd
+  rpc:
+    secretName: lnd-rpc
+    #secretNamespace: lnd
+    secretUpload: '1'
+  wallet:
+    secretName: lnd-wallet
+    #secretNamespace: lnd
+    dir: /root/.lnd/data/chain/bitcoin/mainnet
+

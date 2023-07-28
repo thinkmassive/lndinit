@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  strategy:
+    type: Recreate
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "lnd.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "lnd.selectorLabels" . | nindent 8 }}
+    spec:
+      # We use the special service account created, so the init script is able
+      # to update the secret as expected.
+      serviceAccountName: {{ .Values.serviceAccount.name | default .Release.Name }}
+
+      containers:
+        # The main lnd container
+        - name: lnd
+          
+          # The lndinit image is an image based on the main lnd image that just
+          # adds the lndinit binary to it. The tag name is simply:
+          #   <lndinit-version>-lnd-<lnd-version>
+          image: {{ .Values.image.name | default "lightninglabs/lndinit" }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- with .Values.lnd }}
+            - name: WALLET_SECRET_NAME
+              value: {{ .wallet.secretName | default "${.Release.Name}-wallet" }}
+            - name: WALLET_SECRET_NAMESPACE
+              value: {{ .wallet.secretNamespace | default $.Release.Namespace }}
+            - name: WALLET_DIR
+              value: {{ .wallet.dir }}
+            - name: CERT_DIR
+              value: {{ .certDir }}
+            - name: UPLOAD_RPC_SECRETS
+              value: {{ .rpc.secretUpload | quote }}
+            - name: RPC_SECRETS_NAME
+              value: {{ .rpc.secretName | default "${.Release.Name}-wallet" }}
+            - name: RPC_SECRETS_NAMESPACE
+              value: {{ .rpc.secretNamespace | default $.Release.Namespace }}
+            {{- end }}
+          command: [ '/init-wallet-k8s.sh' ]
+          args: [
+              '--bitcoin.mainnet',
+              '--bitcoin.active',
+              {{- if .Values.lnd.bitcoind.enabled }}
+              '--bitcoind.rpchost={{ .Values.lnd.bitcoind.hostname }}:{{ .Values.lnd.bitcoind.port | default "8332" }}'
+              {{- end }}
+              {{- if .Values.lnd.btcd.enabled }}
+              '--btcd.rpchost={{ .Values.lnd.btcd.hostname }}:{{ .Values.lnd.btcd.port | default "8334" }}'
+              {{- end }}
+              '--wallet-unlock-password-file=/tmp/wallet-password',
+          ]
